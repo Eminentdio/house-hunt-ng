@@ -1,364 +1,56 @@
--- Seed script for HouseHunt NG Phase 1
--- Run this in your Supabase SQL Editor after creating the schema
+-- ============================================================
+-- HouseHunt NG - sample listings (optional, for development)
+--
+-- BEFORE running this:
+--   1. Run schema.sql, then 002_security_hardening.sql
+--   2. Sign up in the app as a LANDLORD (or add a user in
+--      Supabase -> Authentication -> Users, then set role below)
+--
+-- To make yourself admin (SQL editor only):
+--   update profiles set role = 'admin' where username = 'YOUR_USERNAME';
+--
+-- This script attaches 5 approved sample houses to the first landlord found.
+-- It creates NO users, NO agreements and NO payments.
+-- ============================================================
+do $$
+declare
+  v_landlord uuid;
+  v_reno_house uuid;
+begin
+  select id into v_landlord from profiles where role = 'landlord' order by created_at limit 1;
+  if v_landlord is null then
+    raise exception 'No landlord account yet. Sign up as a Landlord in the app first, then re-run this seed.';
+  end if;
 
--- ============================================
--- Seed data: profiles
--- ============================================
+  insert into landlord_profiles (user_id, verified) values (v_landlord, true)
+  on conflict (user_id) do update set verified = true;
 
--- Admin user (username: admin, email: admin@househunt.ng)
-INSERT INTO profiles (id, username, full_name, email, phone, role, created_at)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'admin',
-  'Admin User',
-  'admin@househunt.ng',
-  '+234-800-000-0001',
-  'admin',
-  now()
-);
+  insert into houses (
+    landlord_id, title, description, house_type, category_id, location_text, city,
+    lat, lng, vacant_space, house_status, annual_rent_kobo, tenancy_period_months,
+    is_available, approval_status
+  )
+  select
+    v_landlord, h.title, h.description, h.house_type, c.id, h.location_text, h.city,
+    h.lat, h.lng, h.vacant_space, h.house_status, h.rent_naira * 100, 12,
+    h.is_available, 'approved'
+  from (values
+    ('self-contain',     'Modern Self Contain',   'Clean self-contained room with tiled floor, prepaid meter and good water supply.',          'self-contain',   '12 Yaba Road, Yaba',          'Lagos', 6.5150, 3.3790, 1, 'available',        900000,  true),
+    ('1-bedroom-flat',   'Cozy 1 Bedroom Flat',   'One-bedroom flat with a separate living room, fitted kitchen and secure compound.',         '1-bedroom-flat', '45 Surulere Street',          'Lagos', 6.4969, 3.3556, 1, 'available',        1500000, true),
+    ('2-bedroom-flat',   'Spacious 2 Bedroom Flat','Two bedrooms, spacious living room and private balcony in a quiet, secure estate.',        '2-bedroom-flat', '456 Lekki Phase 1',           'Lagos', 6.4474, 3.4745, 2, 'available',        2800000, true),
+    ('3-bedroom-flat',   'Luxury 3 Bedroom Flat', 'Premium finishes, ample parking and 24/7 security. Walking distance to shops.',            '3-bedroom-flat', '789 Ikoyi Road',              'Lagos', 6.4550, 3.4350, 3, 'available',        6500000, true),
+    ('duplex',           'Family Duplex',         'Four-bedroom duplex with boys quarters, currently being renovated and repainted.',          'duplex',         '3 Maitama District',          'Abuja', 9.0830, 7.4930, 4, 'under_renovation', 9000000, false)
+  ) as h(slug, title, description, house_type, location_text, city, lat, lng, vacant_space, house_status, rent_naira, is_available)
+  join categories c on c.slug = h.slug;
 
--- Landlord user (username: landlord, email: landlord@househunt.ng)
-INSERT INTO profiles (id, username, full_name, email, phone, role, created_at)
-VALUES (
-  '00000000-0000-0000-0000-000000000002',
-  'landlord',
-  'Landlord User',
-  'landlord@househunt.ng',
-  '+234-800-000-0002',
-  'landlord',
-  now()
-);
+  -- placeholder photos (replace with real uploads in Phase 2)
+  insert into house_media (house_id, kind, room_label, url, sort_order)
+  select id, 'photo', 'Exterior', 'https://picsum.photos/seed/' || id || '/800/600', 0 from houses where landlord_id = v_landlord;
 
--- Tenant user (username: tenant, email: tenant@househunt.ng)
-INSERT INTO profiles (id, username, full_name, email, phone, role, created_at)
-VALUES (
-  '00000000-0000-0000-0000-000000000003',
-  'tenant',
-  'Tenant User',
-  'tenant@househunt.ng',
-  '+234-800-000-0003',
-  'tenant',
-  now()
-);
-
--- ============================================
--- Seed data: landlord_profiles
--- ============================================
-
-INSERT INTO landlord_profiles (user_id, date_of_birth, id_document_url, bank_account_name, bank_code, account_number_last4, paystack_recipient_code, verified, created_at)
-VALUES (
-  '00000000-0000-0000-0000-000000000002',
-  '1990-01-01',
-  'https://example.com/id-docs/landlord-id.pdf',
-  'Landlord User',
-  '000001',
-  '1234',
-  'REC-001',
-  true,
-  now()
-);
-
--- ============================================
--- Seed data: houses
--- ============================================
-
-WITH landlord AS (
-  SELECT id FROM profiles WHERE username = 'landlord' AND role = 'landlord'
-),
-category_self AS (
-  SELECT id FROM categories WHERE slug = 'self-contain'
-),
-category_1bed AS (
-  SELECT id FROM categories WHERE slug = '1-bedroom-flat'
-),
-category_2bed AS (
-  SELECT id FROM categories WHERE slug = '2-bedroom-flat'
-),
-category_3bed AS (
-  SELECT id FROM categories WHERE slug = '3-bedroom-flat'
-),
-category_duplex AS (
-  SELECT id FROM categories WHERE slug = 'duplex'
-),
-category_shop AS (
-  SELECT id FROM categories WHERE slug = 'shop'
-)
-INSERT INTO houses (id, landlord_id, title, description, house_type, category_id, location_text, city, lat, lng, vacant_space, house_status, annual_rent_kobo, tenancy_period_months, is_available, approval_status, created_at)
-SELECT
-  gen_random_uuid(),
-  l.id,
-  'Modern Self Contain Apartment',
-  'A beautiful self-contain apartment in a quiet area with all modern amenities. Perfect for professionals seeking comfort and convenience.',
-  'self-contain',
-  c.id,
-  '123 Victoria Island, Lagos',
-  'Lagos',
-  6.4465,
-  3.4265,
-  1,
-  'available',
-  900000,
-  12,
-  true,
-  'approved',
-  now()
-FROM landlord l, category_self c
-UNION ALL
-SELECT
-  gen_random_uuid(),
-  l.id,
-  'Spacious 2 Bedroom Flat',
-  'Two-bedroom flat with spacious living areas and a private balcony. Located in a prime area with good security.',
-  '2-bedroom-flat',
-  c.id,
-  '456 Lekki Phase 1, Lagos',
-  'Lagos',
-  6.4465,
-  3.4265,
-  2,
-  'available',
-  1200000,
-  12,
-  true,
-  'approved',
-  now()
-FROM landlord l, category_1bed c
-UNION ALL
-SELECT
-  gen_random_uuid(),
-  l.id,
-  'Luxury 3 Bedroom Flat',
-  'Luxury three-bedroom flat with premium finishes and city views. Secure parking and 24/7 security available.',
-  '3-bedroom-flat',
-  c.id,
-  '789 Ikoyi, Lagos',
-  'Lagos',
-  6.4650,
-  3.4450,
-  3,
-  'available',
-  2500000,
-  12,
-  true,
-  'approved',
-  now()
-FROM landlord l, category_3bed c
-UNION ALL
-SELECT
-  gen_random_uuid(),
-  l.id,
-  'Duplex with Garden',
-  'Spacious duplex with private garden and parking for two cars. Ideal for families seeking space and privacy.',
-  'duplex',
-  c.id,
-  '321 Gwarimpa, Abuja',
-  'Abuja',
-  9.0765,
-  7.3986,
-  4,
-  'available',
-  3500000,
-  24,
-  true,
-  'approved',
-  now()
-FROM landlord l, category_duplex c
-UNION ALL
-SELECT
-  gen_random_uuid(),
-  l.id,
-  'Ground Floor Shop Space',
-  'Ground floor shop space in a busy market area with high foot traffic. Great for retail business.',
-  'shop',
-  c.id,
-  '155 Aba Road, Aba',
-  'Aba',
-  5.1083,
-  7.4758,
-  1,
-  'available',
-  1800000,
-  12,
-  true,
-  'approved',
-  now()
-FROM landlord l, category_shop c;
-
--- ============================================
--- Seed data: house_media
--- ============================================
-
-WITH houses AS (
-  SELECT id FROM houses WHERE title = 'Modern Self Contain Apartment'
-)
-INSERT INTO house_media (house_id, kind, room_label, url, sort_order, created_at)
-SELECT
-  h.id,
-  'photo',
-  'Living Room',
-  'https://images.unsplash.com/photo-1560448184-6b0ce4e0a3c4?auto=format&fit=crop&w=800&q=80',
-  0,
-  now()
-FROM houses h
-UNION ALL
-SELECT
-  h.id,
-  'photo',
-  'Kitchen',
-  'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=800&q=80',
-  1,
-  now()
-FROM houses h
-UNION ALL
-SELECT
-  h.id,
-  'tour360',
-  'Entire Apartment',
-  'https://example.com/360/tour1.json',
-  0,
-  now()
-FROM houses h;
-
--- ============================================
--- Seed data: house_videos
--- ============================================
-
-WITH houses AS (
-  SELECT id FROM houses WHERE title = 'Modern Self Contain Apartment'
-)
-INSERT INTO house_videos (house_id, area_label, duration_sec, size_bytes, status, url, thumbnail_url, sort_order, created_at)
-SELECT
-  h.id,
-  'Living Room',
-  45,
-  15728640,
-  'approved',
-  'https://example.com/videos/living-room.mp4',
-  'https://example.com/videos/living-room-thumb.jpg',
-  0,
-  now()
-FROM houses h
-UNION ALL
-SELECT
-  h.id,
-  'Kitchen',
-  30,
-  10485760,
-  'approved',
-  'https://example.com/videos/kitchen.mp4',
-  'https://example.com/videos/kitchen-thumb.jpg',
-  1,
-  now()
-FROM houses h;
-
--- ============================================
--- Seed data: inspections
--- ============================================
-
-WITH houses AS (
-  SELECT id FROM houses WHERE title = 'Modern Self Contain Apartment'
-),
-tenants AS (
-  SELECT id FROM profiles WHERE username = 'tenant' AND role = 'tenant'
-)
-INSERT INTO inspections (house_id, tenant_id, requested_at, scheduled_at, status, created_at)
-SELECT
-  h.id,
-  t.id,
-  now(),
-  now() + interval '2 days',
-  'pending',
-  now()
-FROM houses h, tenants t;
-
--- ============================================
--- Seed data: agreements
--- ============================================
-
-WITH houses AS (
-  SELECT id FROM houses WHERE title = 'Modern Self Contain Apartment'
-),
-tenants AS (
-  SELECT id FROM profiles WHERE username = 'tenant' AND role = 'tenant'
-)
-INSERT INTO agreements (id, house_id, tenant_id, terms_snapshot, tenant_signed_name, signed_at, pdf_path, created_at)
-SELECT
-  gen_random_uuid(),
-  h.id,
-  t.id,
-  'Standard tenancy agreement for 12 months with 15% platform fee',
-  NULL,
-  NULL,
-  NULL,
-  now()
-FROM houses h, tenants t;
-
--- ============================================
--- Seed data: payments
--- ============================================
-
-WITH agreements AS (
-  SELECT id FROM agreements WHERE tenant_id = (SELECT id FROM profiles WHERE username = 'tenant' AND role = 'tenant')
-)
-INSERT INTO payments (id, agreement_id, rent_kobo, fee_kobo, total_kobo, fee_rate, paystack_reference, status, paid_at, escrow_released_at, payout_reference, receipt_pdf_path, created_at)
-SELECT
-  gen_random_uuid(),
-  a.id,
-  900000,
-  135000,
-  1035000,
-  '0.15',
-  'PAY-123456',
-  'held',
-  now(),
-  NULL,
-  'TRANS-123456',
-  NULL,
-  now()
-FROM agreements a;
-
--- ============================================
--- Seed data: renovation_updates
--- ============================================
-
-WITH houses AS (
-  SELECT id FROM houses WHERE title = 'Modern Self Contain Apartment'
-)
-INSERT INTO renovation_updates (house_id, area, area_label, percent_complete, note, photo_url, created_at)
-SELECT
-  h.id,
-  'house',
-  'Entire Property',
-  75,
-  'Renovation almost complete. New paint and fixtures installed.',
-  'https://example.com/renovation/photo1.jpg',
-  now()
-FROM houses h
-UNION ALL
-SELECT
-  h.id,
-  'room',
-  'Living Room',
-  90,
-  'New furniture and lighting installed.',
-  'https://example.com/renovation/photo2.jpg',
-  now()
-FROM houses h;
-
--- ============================================
--- Seed data: notifications_log
--- ============================================
-
-WITH profiles AS (
-  SELECT id, username FROM profiles
-)
-INSERT INTO notifications_log (user_id, type, subject, sent_at, status, created_at)
-SELECT
-  p.id,
-  'email',
-  'Welcome to HouseHunt NG',
-  now(),
-  'sent',
-  now()
-FROM profiles p
-WHERE p.username IN ('tenant', 'landlord');
+  select id into v_reno_house from houses where landlord_id = v_landlord and house_status = 'under_renovation' limit 1;
+  if v_reno_house is not null then
+    insert into renovation_updates (house_id, area, area_label, percent_complete, note) values
+      (v_reno_house, 'house', 'Whole house repaint', 60, 'Exterior and living areas painted.'),
+      (v_reno_house, 'room',  'Master bedroom',       35, 'Wardrobe fitting in progress.');
+  end if;
+end $$;

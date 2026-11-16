@@ -6,7 +6,7 @@ interface AuthContextType {
   user: Profile | null;
   loading: boolean;
   signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
+  signUp: (data: SignUpData) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -91,26 +91,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (data: SignUpData) => {
     try {
-      const { data: existing } = await supabase
-        .from("profiles")
-        .select("id")
-        .ilike("username", data.username)
-        .limit(1);
+      if (!/^[A-Za-z0-9_]{3,20}$/.test(data.username)) {
+        return {
+          error: new Error("Username must be 3-20 characters: letters, numbers or underscore only"),
+        };
+      }
 
-      if (existing && existing.length > 0) {
+      const { data: available, error: rpcError } = await supabase.rpc("username_available", {
+        p_username: data.username,
+      });
+      if (rpcError) throw rpcError;
+      if (!available) {
         return { error: new Error("Username already taken") };
       }
 
-      const { data: existingEmail } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", data.email)
-        .limit(1);
-
-      if (existingEmail && existingEmail.length > 0) {
-        return { error: new Error("Email already registered") };
-      }
-
+      // The profile (and landlord profile) rows are created by the database trigger
+      // `handle_new_user`, which also guarantees nobody can sign up as admin.
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -126,27 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (authError) throw authError;
 
-      if (authData.user) {
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: authData.user.id,
-          username: data.username,
-          full_name: data.fullName,
-          email: data.email,
-          phone: data.phone,
-          role: data.role,
-        });
-
-        if (profileError) throw profileError;
-
-        if (data.role === "landlord") {
-          const { error: llError } = await supabase.from("landlord_profiles").insert({
-            user_id: authData.user.id,
-          });
-          if (llError) throw llError;
-        }
-      }
-
-      return { error: null };
+      return { error: null, needsEmailConfirmation: !authData.session };
     } catch (error) {
       return { error: error as Error };
     }

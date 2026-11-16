@@ -39,37 +39,30 @@ VITE_SUPABASE_URL=your-supabase-project-url
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-public-key
 ```
 
-### 2. Install Dependencies
+### 3. Database setup (run in the Supabase SQL Editor, in this order)
+
+1. `supabase/schema.sql` - tables, base policies, categories
+2. `supabase/002_security_hardening.sql` - locks down roles, payments, listings and personal data; creates the signup trigger
+3. Run the app and **sign up** (once as a Landlord, once as a Tenant)
+4. Make yourself admin (SQL editor only - the app can never create admins):
+
+```sql
+update profiles set role = 'admin' where username = 'YOUR_USERNAME';
+```
+
+5. Optional: `supabase/seed.sql` adds 5 sample approved houses to the first landlord account.
+
+In Supabase -> Authentication -> Providers -> Email, turn **Confirm email** off while developing,
+or confirm each test account from the email link.
+
+### 4. Run the Development Server
 
 ```bash
 npm install
-```
-
-### 3. Database Schema
-
-Run the schema SQL in your Supabase SQL Editor:
-
-```bash
-supabase db reset  # or run supabase/schema.sql manually
-```
-
-The schema file is at `supabase/schema.sql`.
-
-### 4. Seed Data
-
-Run the seed SQL to populate initial data:
-
-```bash
-supabase db execute < supabase/seed.sql
-```
-
-### 5. Run the Development Server
-
-```bash
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) to view the app.
+Open [http://localhost:8080](http://localhost:8080).
 
 ## Available Scripts
 

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Home, Loader2 } from "lucide-react";
+import { showSuccess } from "@/utils/toast";
 
 interface SignupForm {
   username: string;
@@ -39,11 +40,16 @@ export default function SignupPage() {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const { error } = await signUp(form);
+    const { error, needsEmailConfirmation } = await signUp(form);
     setSubmitting(false);
     if (error) {
       setError(error.message);
     } else {
+      showSuccess(
+        needsEmailConfirmation
+          ? "Account created. Check your email to confirm it, then log in."
+          : "Account created. You can now log in."
+      );
       navigate("/login");
     }
   };

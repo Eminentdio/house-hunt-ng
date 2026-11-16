@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,13 @@ export default function LoginPage() {
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
 
+  // Redirect to the right dashboard once the profile has loaded
+  useEffect(() => {
+    if (!user) return;
+    const home = { admin: "/admin", landlord: "/landlord", tenant: "/tenant" }[user.role] ?? "/";
+    navigate(home, { replace: true });
+  }, [user, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -25,11 +32,8 @@ export default function LoginPage() {
     setSubmitting(false);
     if (error) {
       setError(error.message);
-    } else {
-      // Role-based redirect happens via the auth state change;
-      // default to tenant dashboard, guards will redirect if needed.
-      navigate("/tenant");
     }
+    // On success the effect above redirects by role.
   };
 
   return (
