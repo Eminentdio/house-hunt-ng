@@ -43,14 +43,17 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-public-key
 
 1. `supabase/schema.sql` - tables, base policies, categories
 2. `supabase/002_security_hardening.sql` - locks down roles, payments, listings and personal data; creates the signup trigger
-3. Run the app and **sign up** (once as a Landlord, once as a Tenant)
-4. Make yourself admin (SQL editor only - the app can never create admins):
+3. `supabase/003_phase2_listings_and_storage.sql` - storage buckets (photos, videos, private ID documents), video limits, listing moderation
+4. `supabase/004_seed_categories.sql` - ensures all category slugs exist (also run this on existing projects)
+5. `supabase/005_application_table_grants.sql` - grants API table privileges required alongside RLS policies
+6. Run the app and **sign up** (once as a Landlord, once as a Tenant)
+7. Make yourself admin (SQL editor only - the app can never create admins):
 
 ```sql
 update profiles set role = 'admin' where username = 'YOUR_USERNAME';
 ```
 
-5. Optional: `supabase/seed.sql` adds 5 sample approved houses to the first landlord account.
+8. Optional: `supabase/seed.sql` adds 5 sample approved houses to the first landlord account.
 
 In Supabase -> Authentication -> Providers -> Email, turn **Confirm email** off while developing,
 or confirm each test account from the email link.
@@ -123,12 +126,22 @@ Open [http://localhost:8080](http://localhost:8080).
 - **Naira formatting**: Custom formatting component
 - **Responsive**: Mobile-first breakpoints
 
+## Phase 2 (done): landlord listings, uploads, admin approval
+
+| Who | What |
+|---|---|
+| Landlord | Profile & verification (DOB, ID upload, bank), add/edit houses, photos, 360° photos, up to 3 videos (3 min / 150 MB each), resubmit rejected listings |
+| Admin | Verify landlords (view ID via short-lived link), approve/reject listings and each video, manage categories |
+| Public | `/categories` gallery and `/categories/:slug` grid showing location and price under each photo |
+
+Rules enforced in the database: a landlord cannot approve their own listing or video, an unverified landlord's listing cannot be approved, editing the price/location/category of an approved listing sends it back for review, and a house can never have more than 3 videos.
+
 ## Phase Roadmap
 
 | Phase | Focus |
 |-------|-------|
 | 1 | Foundation (complete) |
-| 2 | Landlord listings, house CRUD, media upload, admin approval |
+| 2 | Landlord listings, house CRUD, media upload, admin approval (complete) |
 | 3 | Tenant experience: search, filters, house feature page |
 | 4 | Agreement & payment: PDF, Paystack, escrow, receipts |
 | 5 | Notifications: Resend emails, audit log, polish |
@@ -149,3 +162,7 @@ Open [http://localhost:8080](http://localhost:8080).
 - Username login resolves via secure RPC (no user enumeration in error messages)
 - Rate limiting should be implemented on login and payment initialization
 - NDPA 2023 compliance: collect minimal data, show privacy notice, get consent at signup
+## Tests
+
+- `npm test` - UI smoke tests (screens render, fee preview, form validation)
+- `bash supabase/tests/run.sh` - database security tests on a local Postgres (roles, payments, uploads, moderation)

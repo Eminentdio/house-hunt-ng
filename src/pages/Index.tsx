@@ -153,12 +153,13 @@ export default function Index() {
               Find the space that fits your life
             </p>
           </div>
+          <Link to="/categories" className="text-sm font-medium text-primary hover:underline hidden sm:block">View all →</Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {categories.map((cat) => (
             <Link
               key={cat.slug}
-              to="/signup"
+              to={`/categories/${cat.slug}`}
               className="group rounded-xl border bg-card p-5 flex flex-col items-center gap-3 hover:border-primary hover:shadow-md transition-all"
             >
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">

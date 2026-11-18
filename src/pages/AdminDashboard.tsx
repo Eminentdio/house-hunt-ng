@@ -1,115 +1,43 @@
-import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import DashboardShell from "@/components/DashboardShell";
+import LandlordReview, { useLandlordApplications } from "@/components/admin/LandlordReview";
+import ListingReview from "@/components/admin/ListingReview";
+import CategoryManager from "@/components/admin/CategoryManager";
+import { verificationState } from "@/components/landlord/ProfileForm";
 import { Badge } from "@/components/ui/badge";
-import { LucideIcon } from "lucide-react";
-import { Home, Users, FileText, CreditCard, Settings, LogOut, Shield } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdminDashboard() {
-  const { user, signOut } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") ?? "listings";
 
-  const handleSignOut = async () => {
-    await signOut();
-  };
+  const { data: landlords } = useLandlordApplications();
+  const pendingLandlords = (landlords ?? []).filter((l) => verificationState(l) === "pending").length;
+  const { data: pendingListings } = useQuery({
+    queryKey: ["admin_pending_count"],
+    queryFn: async () => {
+      const { count, error } = await supabase.from("houses").select("id", { count: "exact", head: true }).eq("approval_status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const bubble = (n?: number) => (n ? <Badge className="ml-1.5 h-5 px-1.5">{n}</Badge> : null);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary">HouseHunt NG</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">Welcome, {user?.full_name}</span>
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Admin Dashboard</h2>
-          <p className="text-gray-600 mt-2">Manage the platform</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
-                Landlords
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">Approve or reject landlord accounts</p>
-              <Button className="mt-4 w-full">
-                Review Landlords
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Home className="w-5 h-5 text-primary" />
-                Listings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">Review and approve house listings</p>
-              <Button variant="outline" className="mt-4 w-full">
-                Review Listings
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-primary" />
-                Payments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">Manage escrow and refunds</p>
-              <Button variant="outline" className="mt-4 w-full">
-                View Payments
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5 text-primary" />
-                Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">Manage fee rate and categories</p>
-              <Button variant="outline" className="mt-4 w-full">
-                Manage Config
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                Audit Log
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">View admin actions and notifications</p>
-              <Button variant="outline" className="mt-4 w-full">
-                View Audit Log
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </div>
+    <DashboardShell title="Admin dashboard" subtitle="Verify landlords, review listings and manage categories.">
+      <Tabs value={tab} onValueChange={(t) => setParams({ tab: t }, { replace: true })}>
+        <TabsList>
+          <TabsTrigger value="listings">Listings{bubble(pendingListings)}</TabsTrigger>
+          <TabsTrigger value="landlords">Landlords{bubble(pendingLandlords)}</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+        </TabsList>
+        <TabsContent value="listings" className="mt-4"><ListingReview /></TabsContent>
+        <TabsContent value="landlords" className="mt-4"><LandlordReview /></TabsContent>
+        <TabsContent value="categories" className="mt-4"><CategoryManager /></TabsContent>
+      </Tabs>
+    </DashboardShell>
   );
 }

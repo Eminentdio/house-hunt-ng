@@ -19,6 +19,7 @@ export interface LandlordProfile {
   account_number_last4: string | null;
   paystack_recipient_code: string | null;
   verified: boolean;
+  rejection_reason: string | null;
 }
 
 export interface House {
@@ -38,6 +39,7 @@ export interface House {
   tenancy_period_months: number;
   is_available: boolean;
   approval_status: "pending" | "approved" | "rejected";
+  rejection_reason: string | null;
   created_at: string;
 }
 

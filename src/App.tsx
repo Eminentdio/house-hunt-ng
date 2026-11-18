@@ -10,6 +10,9 @@ import Signup from "./pages/Signup";
 import TenantDashboard from "./pages/TenantDashboard";
 import LandlordDashboard from "./pages/LandlordDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import HouseEditor from "./pages/HouseEditor";
+import Categories from "./pages/Categories";
+import CategoryHouses from "./pages/CategoryHouses";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +53,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/categories/:slug" element={<CategoryHouses />} />
             <Route
               path="/tenant"
               element={
@@ -63,6 +68,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["landlord", "admin"]}>
                   <LandlordDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/landlord/houses/:id"
+              element={
+                <ProtectedRoute allowedRoles={["landlord", "admin"]}>
+                  <HouseEditor />
                 </ProtectedRoute>
               }
             />
